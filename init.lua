@@ -3,7 +3,6 @@
 =====================================================================
 ==================== READ THIS BEFORE CONTINUING ====================
 =====================================================================
-
 Kickstart.nvim is *not* a distribution.
 
 Kickstart.nvim is a template for your own configuration.
@@ -68,9 +67,6 @@ require('lazy').setup({
   -- Git related plugins
   'tpope/vim-fugitive',
   'tpope/vim-rhubarb',
-
-  -- Detect tabstop and shiftwidth automatically
-  'tpope/vim-sleuth',
 
   -- NOTE: This is where your plugins related to LSP can be installed.
   --  The configuration is done below. Search for lspconfig to find it below.
@@ -148,9 +144,11 @@ require('lazy').setup({
         theme = 'onedark',
         component_separators = '|',
         section_separators = '',
+        globalstatus = true
       },
     },
   },
+
 
   {
     -- Add indentation guides even on blank lines
@@ -205,6 +203,29 @@ require('lazy').setup({
   { import = 'custom.plugins' },
 }, {})
 
+-- [[ Custom Autocommands ]]
+
+local function placeHelpWindow(opts)
+  if vim.bo.buftype == 'help' and opts.file ~= "" then
+    local currentTabWindows = vim.api.nvim_tabpage_list_wins(0)
+    local filteredWindows = {}
+    for i = 1, #currentTabWindows do
+      local windowConfig = vim.api.nvim_win_get_config(currentTabWindows[i])
+      local relative = windowConfig["relative"]
+      local external = windowConfig["external"]
+      if relative == "" and external == false then table.insert(filteredWindows, windowConfig) end
+    end
+    local currentTabWindowNum = #filteredWindows
+    if currentTabWindowNum > 2 then
+      vim.cmd("wincmd K")
+    else
+      vim.cmd("wincmd L")
+    end
+  end
+end
+
+local initAutocommandGroup = vim.api.nvim_create_augroup('initlua', { clear = true })
+vim.api.nvim_create_autocmd('BufWinEnter', { pattern = "*", group = initAutocommandGroup, desc = "Manage how help text window layout is handled", callback = placeHelpWindow })
 -- [[ Setting options ]]
 -- See `:help vim.o`
 -- NOTE: You can change these options as you wish!
@@ -214,17 +235,23 @@ vim.o.hlsearch = false
 
 -- Make line numbers default
 vim.wo.number = true
+vim.o.relativenumber = true
 
 -- Enable mouse mode
 vim.o.mouse = 'a'
 
--- Sync clipboard between OS and Neovim.
---  Remove this option if you want your OS clipboard to remain independent.
---  See `:help 'clipboard'`
-vim.o.clipboard = 'unnamedplus'
-
 -- Enable break indent
 vim.o.breakindent = true
+vim.opt.breakindentopt = { "min:30", "sbr" }
+vim.o.linebreak = true
+vim.o.showbreak = '>> '
+vim.o.breakat = ' \t;,!?./'
+
+-- Tab settings
+vim.o.tabstop = 2
+vim.o.softtabstop = 2
+vim.o.expandtab = true
+vim.o.shiftwidth = 2
 
 -- Save undo history
 vim.o.undofile = true
@@ -248,6 +275,42 @@ vim.o.completeopt = 'menuone,noselect'
 vim.o.termguicolors = true
 
 -- [[ Basic Keymaps ]]
+
+-- Custom
+vim.keymap.set('i', 'jk', '<ESC>', { noremap = true, desc = "escape insert mode" })
+vim.keymap.set('n', '<CR>', 'mpo<ESC>`p', { noremap = true, desc = "insert line below cursor" })
+vim.keymap.set('n', ';', 'mpO<ESC>`p', { noremap = true, desc = "insert line above cursor" })
+
+-- moving around the vimspace
+vim.keymap.set('n', '<leader>l', '<C-w>l', { noremap = true, desc = "move to right window" })
+vim.keymap.set('n', '<leader>h', '<C-w>h', { noremap = true, desc = "move to left window" })
+vim.keymap.set('n', '<leader>j', '<C-w>j', { noremap = true, desc = "move to lower window" })
+vim.keymap.set('n', '<leader>k', '<C-w>k', { noremap = true, desc = "move to upper window" })
+vim.keymap.set('n', '<S-j>', '<C-f>', { noremap = true, desc = "page down" })
+vim.keymap.set('n', '<S-k>', '<C-b>', { noremap = true, desc = "page up" })
+vim.keymap.set('n', '<tab>', ':bnext<CR>', { noremap = true, desc = "move to next buffer" })
+vim.keymap.set('n', '<S-tab>', ':bprevious<CR>', { noremap = true, desc = "move to previous buffer" })
+vim.keymap.set('n', '<Leader>b', ':buffers<CR>', { noremap = true, desc = "show buffers" })
+vim.keymap.set('n', '<Leader><tab>', ':tabnext<CR>', { noremap = true, desc = "move to next tab" })
+vim.keymap.set('n', '<Leader><S-tab>', ':tabprevious<CR>', { noremap = true, desc = "move to previous tab" })
+
+-- undo and redo
+vim.keymap.set('n', '<C-u>', 'u', { noremap = true, desc = "undo changes with CTRL U from normal mode" })
+vim.keymap.set('i', '<C-u>', '<ESC>ui', { noremap = true, desc = "undo changes from insert mode" })
+
+-- Copy and paste to Windows clipboard
+function WindowsCopy()
+  local visualSelection = require('custom.tools.tools').GetVisualSelection()
+  local visSelectionJoined = table.concat(visualSelection, "\n")
+  local echoSafeString = string.gsub(visSelectionJoined, "\'", "\'\\\'\'")
+  local gClip = '/mnt/c/Windows/System32/clip.exe'
+  os.execute("echo \'" .. echoSafeString .. '\' | ' .. gClip)
+end
+
+vim.keymap.set('v', '<C-c>', WindowsCopy, { desc = "copy to windows" })
+
+-- Saving files
+vim.keymap.set('n', '<C-s>', ':w<CR>', { noremap = true, desc = "save current buffer/file" })
 
 -- Keymaps for better default experience
 -- See `:help vim.keymap.set()`
@@ -302,71 +365,6 @@ vim.keymap.set('n', '<leader>sw', require('telescope.builtin').grep_string, { de
 vim.keymap.set('n', '<leader>sg', require('telescope.builtin').live_grep, { desc = '[S]earch by [G]rep' })
 vim.keymap.set('n', '<leader>sd', require('telescope.builtin').diagnostics, { desc = '[S]earch [D]iagnostics' })
 
--- [[ Configure Treesitter ]]
--- See `:help nvim-treesitter`
-require('nvim-treesitter.configs').setup {
-  -- Add languages to be installed here that you want installed for treesitter
-  ensure_installed = { 'c', 'cpp', 'go', 'lua', 'python', 'rust', 'tsx', 'typescript', 'vimdoc', 'vim' },
-
-  -- Autoinstall languages that are not installed. Defaults to false (but you can change for yourself!)
-  auto_install = false,
-
-  highlight = { enable = true },
-  indent = { enable = true },
-  incremental_selection = {
-    enable = true,
-    keymaps = {
-      init_selection = '<c-space>',
-      node_incremental = '<c-space>',
-      scope_incremental = '<c-s>',
-      node_decremental = '<M-space>',
-    },
-  },
-  textobjects = {
-    select = {
-      enable = true,
-      lookahead = true, -- Automatically jump forward to textobj, similar to targets.vim
-      keymaps = {
-        -- You can use the capture groups defined in textobjects.scm
-        ['aa'] = '@parameter.outer',
-        ['ia'] = '@parameter.inner',
-        ['af'] = '@function.outer',
-        ['if'] = '@function.inner',
-        ['ac'] = '@class.outer',
-        ['ic'] = '@class.inner',
-      },
-    },
-    move = {
-      enable = true,
-      set_jumps = true, -- whether to set jumps in the jumplist
-      goto_next_start = {
-        [']m'] = '@function.outer',
-        [']]'] = '@class.outer',
-      },
-      goto_next_end = {
-        [']M'] = '@function.outer',
-        [']['] = '@class.outer',
-      },
-      goto_previous_start = {
-        ['[m'] = '@function.outer',
-        ['[['] = '@class.outer',
-      },
-      goto_previous_end = {
-        ['[M'] = '@function.outer',
-        ['[]'] = '@class.outer',
-      },
-    },
-    swap = {
-      enable = true,
-      swap_next = {
-        ['<leader>a'] = '@parameter.inner',
-      },
-      swap_previous = {
-        ['<leader>A'] = '@parameter.inner',
-      },
-    },
-  },
-}
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = 'Go to previous diagnostic message' })
@@ -402,8 +400,8 @@ local on_attach = function(_, bufnr)
   nmap('<leader>ws', require('telescope.builtin').lsp_dynamic_workspace_symbols, '[W]orkspace [S]ymbols')
 
   -- See `:help K` for why this keymap
-  nmap('K', vim.lsp.buf.hover, 'Hover Documentation')
-  nmap('<C-k>', vim.lsp.buf.signature_help, 'Signature Documentation')
+  nmap('<Leader>K', vim.lsp.buf.hover, 'Hover Documentation')
+  nmap('<Leader><C-k>', vim.lsp.buf.signature_help, 'Signature Documentation')
 
   -- Lesser used LSP functionality
   nmap('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
