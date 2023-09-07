@@ -16,9 +16,9 @@ return {
 				enable = true,
 				keymaps = {
 					init_selection = '<leader>t',
-					node_incremental = '<c-space>',
-					scope_incremental = '<c-s>',
-					node_decremental = '<M-space>',
+					node_incremental = '<TAB>',
+					scope_incremental = '<CR>',
+					node_decremental = '<S-TAB>',
 				},
 			},
 			indent = { enable = true },

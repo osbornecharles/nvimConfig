@@ -144,7 +144,7 @@ require('lazy').setup({
         theme = 'onedark',
         component_separators = '|',
         section_separators = '',
-        globalstatus = true
+        globalstatus = false
       },
     },
   },
@@ -202,6 +202,12 @@ require('lazy').setup({
   --    For additional information see: https://github.com/folke/lazy.nvim#-structuring-your-plugins
   { import = 'custom.plugins' },
 }, {})
+
+-- [[ Dealing with Diagnostics]]
+vim.diagnostic.config({
+  virtual_text = false
+})
+vim.keymap.set("", "<Leader>E", vim.diagnostic.open_float, { desc = "show diagnostics"})
 
 -- [[ Custom Autocommands ]]
 
@@ -276,10 +282,24 @@ vim.o.termguicolors = true
 
 -- [[ Basic Keymaps ]]
 
+GetVisualSelection = require('custom.tools.tools').GetVisualSelection
+
 -- Custom
 vim.keymap.set('i', 'jk', '<ESC>', { noremap = true, desc = "escape insert mode" })
 vim.keymap.set('n', '<CR>', 'mpo<ESC>`p', { noremap = true, desc = "insert line below cursor" })
 vim.keymap.set('n', ';', 'mpO<ESC>`p', { noremap = true, desc = "insert line above cursor" })
+vim.keymap.set('n', '<leader>ys', '/<c-r>"', { noremap = true, desc = "search for last yanked text (Yanked Search)"})
+
+-- open links in browser
+
+-- [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/addEventListener)
+local function goToLink()
+  local url = GetVisualSelection()[1]
+  print('url: ' .. url)
+  print('shellescape url: ' .. vim.fn.shellescape(url, 1))
+  vim.fn.system("xdg-open" .. vim.fn.shellescape(url, 1))
+end
+vim.keymap.set('v', 'gx', goToLink, { noremap = true, desc = "go to link highlighted by cursor" })
 
 -- moving around the vimspace
 vim.keymap.set('n', '<leader>l', '<C-w>l', { noremap = true, desc = "move to right window" })
@@ -293,21 +313,24 @@ vim.keymap.set('n', '<S-tab>', ':bprevious<CR>', { noremap = true, desc = "move 
 vim.keymap.set('n', '<Leader>b', ':buffers<CR>', { noremap = true, desc = "show buffers" })
 vim.keymap.set('n', '<Leader><tab>', ':tabnext<CR>', { noremap = true, desc = "move to next tab" })
 vim.keymap.set('n', '<Leader><S-tab>', ':tabprevious<CR>', { noremap = true, desc = "move to previous tab" })
+vim.keymap.set('t', "jk", "<C-\\><C-n>", { noremap = true, desc = "Back to normal mode from terminal mode" })
 
 -- undo and redo
 vim.keymap.set('n', '<C-u>', 'u', { noremap = true, desc = "undo changes with CTRL U from normal mode" })
 vim.keymap.set('i', '<C-u>', '<ESC>ui', { noremap = true, desc = "undo changes from insert mode" })
 
--- Copy and paste to Windows clipboard
-function WindowsCopy()
-  local visualSelection = require('custom.tools.tools').GetVisualSelection()
-  local visSelectionJoined = table.concat(visualSelection, "\n")
+-- Copy to Windows clipboard
+local function WindowsCopy()
+  local visSelectionJoined = table.concat(GetVisualSelection(), "\n")
   local echoSafeString = string.gsub(visSelectionJoined, "\'", "\'\\\'\'")
   local gClip = '/mnt/c/Windows/System32/clip.exe'
   os.execute("echo \'" .. echoSafeString .. '\' | ' .. gClip)
 end
 
 vim.keymap.set('v', '<C-c>', WindowsCopy, { desc = "copy to windows" })
+
+-- Visually highlight entire page (Visual All)
+vim.keymap.set('n', '<leader>va', 'gg0vG$', { desc = "visually highlight entire page (Visual All)", noremap = true });
 
 -- Saving files
 vim.keymap.set('n', '<C-s>', ':w<CR>', { noremap = true, desc = "save current buffer/file" })
@@ -333,12 +356,16 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 
 -- [[ Configure Telescope ]]
 -- See `:help telescope` and `:help telescope.setup()`
+
+local telescope_actions = require('telescope.actions')
 require('telescope').setup {
   defaults = {
     mappings = {
       i = {
         ['<C-u>'] = false,
         ['<C-d>'] = false,
+        ['<C-e>'] = { "<esc>", type = "command" },
+        ['<esc>'] = telescope_actions.close
       },
     },
   },
@@ -427,7 +454,7 @@ local servers = {
   -- gopls = {},
   -- pyright = {},
   -- rust_analyzer = {},
-  -- tsserver = {},
+  tsserver = {},
 
   lua_ls = {
     Lua = {
